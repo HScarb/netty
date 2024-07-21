@@ -40,14 +40,18 @@ public final class EchoServer {
         // Configure SSL.
         final SslContext sslCtx = ServerUtil.buildSslContext();
 
+        // 创建主从 Reactor 线程组
         // Configure the server.
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         final EchoServerHandler serverHandler = new EchoServerHandler();
         try {
             ServerBootstrap b = new ServerBootstrap();
+            // 配置主从 Reactor
             b.group(bossGroup, workerGroup)
+                // 配置主 Reactor 中的服务端 channel 类型，NioServerSocketChannel 是 JDK NIO 中 ServerSocketChannel 的封装
              .channel(NioServerSocketChannel.class)
+                // 设置服务端 ServerSocketChannel 的 SocketOption，SO_BACKLOG 表示服务端接受客户端连接的队列长度
              .option(ChannelOption.SO_BACKLOG, 100)
              .handler(new LoggingHandler(LogLevel.INFO))
              .childHandler(new ChannelInitializer<SocketChannel>() {

@@ -54,6 +54,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@link SingleThreadEventLoop} implementation which register the {@link Channel}'s to a
  * {@link Selector} and so does the multi-plexing of these in the event loop.
  *
+ * Reactor 实现，单线程线程池，类似于JDK中的SingleThreadExecutor，
+ * 仅用一个线程来执行轮询IO就绪事件，处理IO就绪事件，执行异步任务。同时待执行的异步任务保存在Reactor里的taskQueue中。
  */
 public final class NioEventLoop extends SingleThreadEventLoop {
 
@@ -61,6 +63,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private static final int CLEANUP_INTERVAL = 256; // XXX Hard-coded value, but won't need customization.
 
+    /**
+     * Selector 优化开关，默认开启。为了遍历的效率，会对 Selector 中的 SelectedKeys 进行数据结构优化
+     */
     private static final boolean DISABLE_KEY_SET_OPTIMIZATION =
             SystemPropertyUtil.getBoolean("io.netty.noKeySetOptimization", false);
 
@@ -119,6 +124,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private Selector unwrappedSelector;
     private SelectedSelectionKeySet selectedKeys;
 
+    /**
+     * 用于创建 NIO Selector，ServerSocketChannel
+     */
     private final SelectorProvider provider;
 
     private static final long AWAKE = -1L;
@@ -130,6 +138,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     //    other value T    when EL is waiting with wakeup scheduled at time T
     private final AtomicLong nextWakeupNanos = new AtomicLong(AWAKE);
 
+    /**
+     * Selector 轮询策略，决定什么时候轮询，什么时候处理 I/O 事件，什么时候执行异步任务
+     */
     private final SelectStrategy selectStrategy;
 
     private volatile int ioRatio = 50;
@@ -171,6 +182,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * 创建 I/O 多路复用的 Selector，并对创建出来的 NIO 原生 Selector 进行性能优化。
+     * SelectorProvider 会根据操作系统的不同选择JDK在不同操作系统版本下的对应 Selector 的实现。
+     * Linux下会选择 Epoll，Mac 下会选择 Kqueue。
+     *
+     * @return
+     */
     private SelectorTuple openSelector() {
         final Selector unwrappedSelector;
         try {
@@ -180,6 +198,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         if (DISABLE_KEY_SET_OPTIMIZATION) {
+            // JDK NIO 原生 Selector 优化开关关闭则返回。该开关默认开启，对 Selector 进行优化
             return new SelectorTuple(unwrappedSelector);
         }
 
