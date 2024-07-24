@@ -22,25 +22,40 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+/**
+ * 对 JDK NIO 中 HashSet 保存的 SelectionKey 的优化，采用数组替换到JDK中的HashSet,这样add操作和遍历操作效率更高，不需要考虑hash冲突
+ */
 final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
 
+    /**
+     * 采用数组替换到JDK中的HashSet,这样add操作和遍历操作效率更高，不需要考虑hash冲突
+     */
     SelectionKey[] keys;
+    /**
+     * 数组尾部指针
+     */
     int size;
 
     SelectedSelectionKeySet() {
+        // 初始化数组大小为 1024
         keys = new SelectionKey[1024];
     }
 
+    /**
+     * 数组的添加效率高于 HashSet 因为不需要考虑hash冲突
+     */
     @Override
     public boolean add(SelectionKey o) {
         if (o == null) {
             return false;
         }
 
+        // 容量不够时扩容数组，到原来的两倍
         if (size == keys.length) {
             increaseCapacity();
         }
 
+        // 时间复杂度 O(1)
         keys[size++] = o;
         return true;
     }
@@ -67,6 +82,9 @@ final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
         return size;
     }
 
+    /**
+     * 采用数组的遍历效率 高于 HashSet
+     */
     @Override
     public Iterator<SelectionKey> iterator() {
         return new Iterator<SelectionKey>() {
@@ -101,6 +119,9 @@ final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
         size = 0;
     }
 
+    /**
+     * 扩容数组，容量翻倍
+     */
     private void increaseCapacity() {
         SelectionKey[] newKeys = new SelectionKey[keys.length << 1];
         System.arraycopy(keys, 0, newKeys, 0, size);

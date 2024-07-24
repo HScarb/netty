@@ -124,8 +124,12 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
      * @param nThreads the number of threads that will be used by this instance.
      * @param executor the Executor to use, or {@code null} if default one should be used.
      * @param chooserFactory the {@link EventExecutorChooserFactory} to use.
+     *                       用于选择将客户端连接 NioSocketChannel 绑定到哪个 Sub Reactor 上
      * @param selectorProvider the {@link SelectorProvider} to use.
+     *                         用于创建 Selector。
+     *                         每个 Reactor 都包含一个 Selector，用于轮询注册在该 Reactor 上所有 Channel 的 IO 事件。
      * @param selectStrategyFactory the {@link SelectStrategyFactory} to use.
+     *                              用于指定轮询策略
      * @param rejectedExecutionHandler the {@link RejectedExecutionHandler} to use.
      * @param taskQueueFactory the {@link EventLoopTaskQueueFactory} to use for
      *                         {@link SingleThreadEventLoop#execute(Runnable)},
@@ -169,6 +173,7 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         SelectorProvider selectorProvider = (SelectorProvider) args[0];
         SelectStrategyFactory selectStrategyFactory = (SelectStrategyFactory) args[1];
         RejectedExecutionHandler rejectedExecutionHandler = (RejectedExecutionHandler) args[2];
+        // Reactor 待执行的异步任务
         EventLoopTaskQueueFactory taskQueueFactory = null;
         EventLoopTaskQueueFactory tailTaskQueueFactory = null;
 

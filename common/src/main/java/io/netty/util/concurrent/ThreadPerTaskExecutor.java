@@ -20,6 +20,10 @@ import io.netty.util.internal.ObjectUtil;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+/**
+ * 任务执行器，为每个任务都新建一个线程来执行
+ * An {@link Executor} which creates a new {@link Thread} for each task.
+ */
 public final class ThreadPerTaskExecutor implements Executor {
     private final ThreadFactory threadFactory;
 

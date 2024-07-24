@@ -19,6 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * Reactor 选择器工厂，负责生成选择策略，选择 Channel 与哪个 Reactor 绑定
+ * 默认策略采用 Round-Robin 轮询选择下一个 Reactor
  * Default implementation which uses simple round-robin to choose next {@link EventExecutor}.
  */
 public final class DefaultEventExecutorChooserFactory implements EventExecutorChooserFactory {
@@ -29,9 +31,12 @@ public final class DefaultEventExecutorChooserFactory implements EventExecutorCh
 
     @Override
     public EventExecutorChooser newChooser(EventExecutor[] executors) {
+        // 判断 Reactor 线程组中的 Reactor 个数是否为 2 的幂次方
         if (isPowerOfTwo(executors.length)) {
+            // 使用位运算 & 代替取模运算 %，提高效率
             return new PowerOfTwoEventExecutorChooser(executors);
         } else {
+            // 使用普通的取模运算 %
             return new GenericEventExecutorChooser(executors);
         }
     }
@@ -48,6 +53,14 @@ public final class DefaultEventExecutorChooserFactory implements EventExecutorCh
             this.executors = executors;
         }
 
+        /**
+         * 轮询选择下一个 Reactor，使用 & 运算符
+         * 如果 executors.length 是 2的幂次方，那么 idx & (executors.length - 1) == idx % executors.length
+         *
+         * 如果 executors.length 是 2 的次幂（例如 2, 4, 8, 16 等），那么 executors.length 的二进制表示形式是 100...0，即只有一个 1，后面跟随若干个 0
+         * executors.length - 1 的二进制表示形式是 011...1，即所有位都是 1
+         * & 运算符是按位与运算，它会将两个操作数的每一位进行与操作。idx & (executors.length - 1) 的结果是 idx 的低位部分
+         */
         @Override
         public EventExecutor next() {
             return executors[idx.getAndIncrement() & executors.length - 1];
@@ -65,6 +78,9 @@ public final class DefaultEventExecutorChooserFactory implements EventExecutorCh
             this.executors = executors;
         }
 
+        /**
+         * 轮询选择下一个 Reactor，使用 % 运算符
+         */
         @Override
         public EventExecutor next() {
             return executors[(int) Math.abs(idx.getAndIncrement() % executors.length)];

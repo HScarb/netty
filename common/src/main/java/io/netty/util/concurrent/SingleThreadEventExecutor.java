@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
+ * 负责对普通任务队列的管理，以及异步任务的执行，Reactor 线程的启停
  * Abstract base class for {@link OrderedEventExecutor}'s that execute all its submitted tasks in a single thread.
  *
  */
@@ -144,6 +145,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * Create a new instance
      *
      * @param parent            the {@link EventExecutorGroup} which is the parent of this instance and belongs to it
+     *                          Reactor 所属的 NioEventLoopGroup Reactor 线程组
      * @param executor          the {@link Executor} which will be used for executing
      * @param addTaskWakesUp    {@code true} if and only if invocation of {@link #addTask(Runnable)} will wake up the
      *                          executor thread
@@ -165,10 +167,15 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                                         boolean addTaskWakesUp, Queue<Runnable> taskQueue,
                                         RejectedExecutionHandler rejectedHandler) {
         super(parent);
+        // 向 Reactor 添加任务时，是否唤醒 Selector，停止轮询 IO 就绪事件，马上执行异步任务
         this.addTaskWakesUp = addTaskWakesUp;
+        // Reactor 普通异步任务队列大小
         this.maxPendingTasks = DEFAULT_MAX_PENDING_EXECUTOR_TASKS;
+        // 用于启动 Reactor 线程的 executor
         this.executor = ThreadExecutorMap.apply(executor, this);
+        // 普通任务队列
         this.taskQueue = ObjectUtil.checkNotNull(taskQueue, "taskQueue");
+        // 任务队列满时的拒绝策略
         this.rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, "rejectedHandler");
     }
 

@@ -37,7 +37,13 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      */
     private final EventExecutor[] children;
     private final Set<EventExecutor> readonlyChildren;
+    /**
+     * 关闭的 Reactor 个数，当 Reactor 全部关闭后，才可以认为 Reactor Group 关闭成功
+     */
     private final AtomicInteger terminatedChildren = new AtomicInteger();
+    /**
+     * 关闭的 Future
+     */
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
     /**
      * Reactor 选择策略，选择一个 Reactor 来接收 Channel 的绑定
@@ -71,7 +77,9 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      *
      * @param nThreads          the number of threads that will be used by this instance.
      * @param executor          the Executor to use, or {@code null} if the default should be used.
+     *                          Reactor 的执行器。Reactor 启动时，会将 Reactor 要做的事封装成 Runnable，丢给 executor 启动
      * @param chooserFactory    the {@link EventExecutorChooserFactory} to use.
+     *                          Reactor 选择器，选择 Channel 要绑定哪个 Reactor
      * @param args              arguments which will passed to each {@link #newChild(Executor, Object...)} call
      */
     protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
@@ -79,7 +87,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         checkPositive(nThreads, "nThreads");
 
         if (executor == null) {
-            // 如果传入的线程为空，创建 Reactor 执行线程
+            // 如果传入的为空，创建默认执行器：为每个 Reactor 都新建一个线程来执行
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
 
@@ -117,18 +125,21 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
             }
         }
 
-        // 创建选择器
+        // 创建 Channel 的 Reactor 选择器
         chooser = chooserFactory.newChooser(children);
 
+        // 创建 Reactor 关闭监听器
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
             @Override
             public void operationComplete(Future<Object> future) throws Exception {
+                // 当所有 Reactor 关闭后，才认为 Reactor Group 关闭成功
                 if (terminatedChildren.incrementAndGet() == children.length) {
                     terminationFuture.setSuccess(null);
                 }
             }
         };
 
+        // 为所有 Reactor 添加关闭监听器
         for (EventExecutor e: children) {
             e.terminationFuture().addListener(terminationListener);
         }

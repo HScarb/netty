@@ -29,14 +29,25 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
+ * 并且提供 Channel 向 Reactor 注册的方法
+ * 负责对尾部任务 tailTasks 进行管理
  * Abstract base class for {@link EventLoop}s that execute all its submitted tasks in a single thread.
  *
  */
 public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor implements EventLoop {
 
+    /**
+     * 任务队列大小，默认是无界队列
+     */
     protected static final int DEFAULT_MAX_PENDING_TASKS = Math.max(16,
             SystemPropertyUtil.getInt("io.netty.eventLoop.maxPendingTasks", Integer.MAX_VALUE));
 
+    /**
+     * 尾部任务队列，存放 Reactor 执行的异步任务
+     * 尾部任务一般不常用，在普通任务执行完后 Reactor 线程会执行尾部任务
+     * 使用场景：
+     * 对 Netty 的允许状态做一些统计数据，例如任务循环的耗时、占用物理内存的大小等。完成统计数据的实时更新
+     */
     private final Queue<Runnable> tailTasks;
 
     protected SingleThreadEventLoop(EventLoopGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
@@ -78,6 +89,9 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
         return (EventLoop) super.next();
     }
 
+    /**
+     * 注册 Channel 到绑定的 Reactor 上
+     */
     @Override
     public ChannelFuture register(Channel channel) {
         return register(new DefaultChannelPromise(channel, this));

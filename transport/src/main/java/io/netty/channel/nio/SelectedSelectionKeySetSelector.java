@@ -21,8 +21,18 @@ import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Set;
 
+/**
+ * 封装类，将 unwrappedSelector 和与 sun.nio.ch.SelectorImpl 类关联好的 Netty 优化实现 SelectedSelectionKeySet 封装装饰起来。
+ * 将所有对Selector的操作全部代理给unwrappedSelector，并在发起轮询IO事件的相关操作中，重置SelectedSelectionKeySet清空上一次的轮询结果。
+ */
 final class SelectedSelectionKeySetSelector extends Selector {
+    /**
+     * Netty 优化后的 SelectedKey 就绪集合
+     */
     private final SelectedSelectionKeySet selectionKeys;
+    /**
+     * 优化后的 JDK NIO 原生 Selector
+     */
     private final Selector delegate;
 
     SelectedSelectionKeySetSelector(Selector delegate, SelectedSelectionKeySet selectionKeys) {
@@ -58,12 +68,14 @@ final class SelectedSelectionKeySetSelector extends Selector {
 
     @Override
     public int select(long timeout) throws IOException {
+        // 重置 SelectedKeys 集合
         selectionKeys.reset();
         return delegate.select(timeout);
     }
 
     @Override
     public int select() throws IOException {
+        // 重置 SelectedKeys 集合
         selectionKeys.reset();
         return delegate.select();
     }
