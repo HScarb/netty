@@ -63,10 +63,26 @@ public final class EchoServer {
                 // 设置服务端 ServerSocketChannel 的 SocketOption，SO_BACKLOG 表示服务端接受客户端连接的队列长度
              .option(ChannelOption.SO_BACKLOG, 100)
                 // 设置服务端 ServerSocketChannel 中对应 Pipeline 中的 ChannelHandler
+                // Netty 再 ServerSocketChannel 的 handler pipeline 中隐式添加了 ServerBootstrapAcceptor
+                // 在实际项目使用过程中，一般不会向服务端 NioServerSocketChannel 添加额外的 ChannelHandler
              .handler(new LoggingHandler(LogLevel.INFO))
                 // 设置客户端 NioSocketChannel 中对应 Pipeline 中的 ChannelHandler
+                // 一个Sub Reactor线程负责处理多个NioSocketChannel上的IO事件，如果Pipeline中的ChannelHandler添加的太多，
+                // 就会影响Sub Reactor线程执行其他NioSocketChannel上的Pipeline，从而降低IO处理效率，降低吞吐量
+                // 所以Pipeline中的ChannelHandler不易添加过多，并且不能在ChannelHandler中执行耗时的业务处理任务
+                /**
+                 * 使用 ChannelInitializer 而不用 ChannelHandler 的原因
+                 * 1. 客户端 NioSocketChannel 是在服务端 accept 连接后在服务端 NioServerSocketChannel 中被创建出来的
+                 *    当前处于配置 ServerBootstrap 阶段，服务端还没有启动，客户端 NioSocketChannel 也没有被创建，
+                 *    无法向客户端 NioSocketChannel 的 pipeline 中添加 ChannelHandler
+                 * 2. 客户端 NioSocketChannel 的 pipeline 中可以添加多个 ChannelHandler，所以 Netty 提供了回调函数 initChannel
+                 *    让用户可以自定义 ChannelHandler 的添加行为
+                 * 客户端 NioSocketChannel 注册到 Sub Reactor 上后，会初始化其 pipeline，此时 Netty 回调 initChannel
+                 */
              .childHandler(new ChannelInitializer<SocketChannel>() {
                  // ChannelInitializer 是当 SocketChannel 成功注册到绑定的 Reactor 上后，用于初始化该 SocketChannel 的 Pipeline
+                 // 适用于向pipeline中添加多个ChannelHandler的场景
+                 // 它本身也是一个 ChannelHandler
                  // initChannel 方法在注册成功后执行
                  @Override
                  public void initChannel(SocketChannel ch) throws Exception {

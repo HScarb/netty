@@ -15,6 +15,13 @@
  */
 package io.netty.bootstrap;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelFuture;
@@ -32,14 +39,9 @@ import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
 /**
+ * 对主从 Reactor 线程组的相关配置进行管理，它主要对从 Reactor 线程组进行配置管理，它的父类主要对主 Reactor 线程组进行配置管理
+ * 带 child 前缀的配置方法是对从 Reactor 线程组的相关配置管理，负责管理的客户端 NioSocketChannel 相关配置存储在 ServerBootstrap 中
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
  *
  */
@@ -47,12 +49,22 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ServerBootstrap.class);
 
+    /**
+     * 客户端 SocketChannel 对应的 ChannelOption 配置
+     */
     // The order in which child ChannelOptions are applied is important they may depend on each other for validation
     // purposes.
     private final Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>();
     private final Map<AttributeKey<?>, Object> childAttrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
     private final ServerBootstrapConfig config = new ServerBootstrapConfig(this);
+
+    /**
+     * Sub Reactor 线程组
+     */
     private volatile EventLoopGroup childGroup;
+    /**
+     * SocketChannel 的 pipeline 中的处理 handler
+     */
     private volatile ChannelHandler childHandler;
 
     public ServerBootstrap() { }
@@ -81,6 +93,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      * {@link Channel}'s.
      */
     public ServerBootstrap group(EventLoopGroup parentGroup, EventLoopGroup childGroup) {
+        // 由父类管理 Main Reactor 线程组
         super.group(parentGroup);
         if (this.childGroup != null) {
             throw new IllegalStateException("childGroup set already");
@@ -150,6 +163,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                     pipeline.addLast(handler);
                 }
 
+                // Netty 隐式添加的 ServerSocketChannel 的 Handler，用于接收客户端连接事件 OP_ACCEPT
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {

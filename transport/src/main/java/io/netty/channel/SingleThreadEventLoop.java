@@ -15,6 +15,12 @@
  */
 package io.netty.channel;
 
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Queue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
+
 import io.netty.util.concurrent.RejectedExecutionHandler;
 import io.netty.util.concurrent.RejectedExecutionHandlers;
 import io.netty.util.concurrent.SingleThreadEventExecutor;
@@ -22,14 +28,8 @@ import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.UnstableApi;
 
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-import java.util.Queue;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
 /**
- * 并且提供 Channel 向 Reactor 注册的方法
+ * 提供 Channel 向 Reactor 注册的方法
  * 负责对尾部任务 tailTasks 进行管理
  * Abstract base class for {@link EventLoop}s that execute all its submitted tasks in a single thread.
  *
