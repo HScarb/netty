@@ -141,23 +141,39 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return this;
     }
 
+    /**
+     * 初始化 NioServerSocketChannel
+     */
     @Override
     void init(Channel channel) {
+        // 向 NioServerSocketChannelConfig 设置 ServerSocketChannelOption
         setChannelOptions(channel, newOptionsArray(), logger);
+        // 向 Netty 自定义的 NioServerSocketChannel 设置 attributes
         setAttributes(channel, newAttributesArray());
 
         ChannelPipeline p = channel.pipeline();
 
+        // 获取 Sub Reactor 线程组
         final EventLoopGroup currentChildGroup = childGroup;
+        // 获取用于初始化客户端 NioSocketChannel 的 ChannelInitializer
         final ChannelHandler currentChildHandler = childHandler;
+        // 获取用户配置的客户端 SocketChannel 的 channelOption 以及 attributes
         final Entry<ChannelOption<?>, Object>[] currentChildOptions = newOptionsArray(childOptions);
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = newAttributesArray(childAttrs);
         final Collection<ChannelInitializerExtension> extensions = getInitializerExtensions();
 
+        // 向 NioServerSocketChannel 中的 pipeline 添加初始化 ChannelHandler 的逻辑
+        /**
+         * 使用 ChannelInitializer 而不用 ChannelHandler 的原因
+         * 1. 为了保证线程安全地初始化 pipeline，初始化动作需要由 Reactor 线程进行，当前线程是用户程序的启动 Main 线程，这里不能立即初始化
+         * 2. 初始化 Channel 中 pipeline 的动作需要等到 Channel 注册到对应的 Reactor 中才可以进行，
+         *    当前只是创建并初始化了 NioServerSocketChannel，并未注册到 Main Reactor 上
+         */
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
+                // ServerBootstrap 中用户显式指定的 handler
                 ChannelHandler handler = config.handler();
                 if (handler != null) {
                     pipeline.addLast(handler);

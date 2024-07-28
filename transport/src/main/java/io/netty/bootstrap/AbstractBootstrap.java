@@ -290,11 +290,14 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(SocketAddress localAddress) {
+        // 校验 Netty 核心组件是否配置齐全
         validate();
+        // 服务端开始启动，绑定端口地址，接收客户端连接
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        // 创建、初始化、异步注册 ServerSocketChannel 到 Main Reactor 线程组
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
@@ -302,11 +305,13 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
 
         if (regFuture.isDone()) {
+            // 注册成功后，绑定端口
             // At this point we know that the registration was complete and successful.
             ChannelPromise promise = channel.newPromise();
             doBind0(regFuture, channel, localAddress, promise);
             return promise;
         } else {
+            // 注册未完成，向 regFuture 添加 operationComplete 回调函数，注册成功后回调
             // Registration future is almost always fulfilled already, but just in case it's not.
             final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
             regFuture.addListener(new ChannelFutureListener() {
@@ -322,6 +327,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
                         // See https://github.com/netty/netty/issues/2586
                         promise.registered();
 
+                        // 注册成功后绑定端口
                         doBind0(regFuture, channel, localAddress, promise);
                     }
                 }
@@ -330,7 +336,11 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
     }
 
+    /**
+     * 创建 ServerSocketChannel，对其初始化，异步注册到 Main Reactor 上
+     */
     final ChannelFuture initAndRegister() {
+        // 创建和初始化 ServerSocketChannel
         Channel channel = null;
         try {
             channel = channelFactory.newChannel();
@@ -346,6 +356,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        // 注册 ServerSocketChannel 到 Main Reactor 线程组
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {

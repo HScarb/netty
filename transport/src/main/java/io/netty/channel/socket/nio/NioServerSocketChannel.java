@@ -15,20 +15,6 @@
  */
 package io.netty.channel.socket.nio;
 
-import io.netty.channel.ChannelException;
-import io.netty.channel.ChannelMetadata;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelOutboundBuffer;
-import io.netty.channel.socket.InternetProtocolFamily;
-import io.netty.util.internal.SocketUtils;
-import io.netty.channel.nio.AbstractNioMessageChannel;
-import io.netty.channel.socket.DefaultServerSocketChannelConfig;
-import io.netty.channel.socket.ServerSocketChannelConfig;
-import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.SuppressJava6Requirement;
-import io.netty.util.internal.logging.InternalLogger;
-import io.netty.util.internal.logging.InternalLoggerFactory;
-
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -41,6 +27,20 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.List;
 import java.util.Map;
 
+import io.netty.channel.ChannelException;
+import io.netty.channel.ChannelMetadata;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelOutboundBuffer;
+import io.netty.channel.nio.AbstractNioMessageChannel;
+import io.netty.channel.socket.DefaultServerSocketChannelConfig;
+import io.netty.channel.socket.InternetProtocolFamily;
+import io.netty.channel.socket.ServerSocketChannelConfig;
+import io.netty.util.internal.PlatformDependent;
+import io.netty.util.internal.SocketUtils;
+import io.netty.util.internal.SuppressJava6Requirement;
+import io.netty.util.internal.logging.InternalLogger;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+
 /**
  * A {@link io.netty.channel.socket.ServerSocketChannel} implementation which uses
  * NIO selector based implementation to accept new connections.
@@ -49,6 +49,10 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
                              implements io.netty.channel.socket.ServerSocketChannel {
 
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);
+
+    /**
+     * JDK NIO SelectorProvider，用于创建 Selector 和 Selectable Channels
+     */
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioServerSocketChannel.class);
@@ -56,6 +60,9 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
     private static final Method OPEN_SERVER_SOCKET_CHANNEL_WITH_FAMILY =
             SelectorProviderUtil.findOpenMethod("openServerSocketChannel");
 
+    /**
+     * 创建 JDK NIO ServerSocketChannel
+     */
     private static ServerSocketChannel newChannel(SelectorProvider provider, InternetProtocolFamily family) {
         try {
             ServerSocketChannel channel =
@@ -66,6 +73,9 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         }
     }
 
+    /**
+     * ServerSocketChannel 相关配置
+     */
     private final ServerSocketChannelConfig config;
 
     /**
@@ -93,7 +103,9 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance using the given {@link ServerSocketChannel}.
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
+        // 父类 AbstractNioChannel 初始化，保存 JDK NIO 原生 ServerSocketChannel 以及要监听的 OP_ACCEPT 操作
         super(null, channel, SelectionKey.OP_ACCEPT);
+        // 创建Channel的配置类NioServerSocketChannelConfig，在配置类中封装了对Channel底层的一些配置行为，以及JDK中的ServerSocket
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());
     }
 

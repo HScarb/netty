@@ -96,6 +96,7 @@ public final class EchoServer {
              });
 
             // 绑定端口地址，开始监听客户端连接事件 OP_ACCEPT
+            // Netty 服务端启动过程在 bind 函数中
             // Start the server.
             ChannelFuture f = b.bind(PORT).sync();
 

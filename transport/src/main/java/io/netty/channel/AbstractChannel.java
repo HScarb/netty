@@ -15,16 +15,6 @@
  */
 package io.netty.channel;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.socket.ChannelOutputShutdownEvent;
-import io.netty.channel.socket.ChannelOutputShutdownException;
-import io.netty.util.DefaultAttributeMap;
-import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectUtil;
-import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.logging.InternalLogger;
-import io.netty.util.internal.logging.InternalLoggerFactory;
-
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
@@ -36,6 +26,16 @@ import java.nio.channels.NotYetConnectedException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.socket.ChannelOutputShutdownEvent;
+import io.netty.channel.socket.ChannelOutputShutdownException;
+import io.netty.util.DefaultAttributeMap;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.internal.ObjectUtil;
+import io.netty.util.internal.PlatformDependent;
+import io.netty.util.internal.logging.InternalLogger;
+import io.netty.util.internal.logging.InternalLoggerFactory;
+
 /**
  * A skeletal {@link Channel} implementation.
  */
@@ -43,9 +43,24 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
 
+    /**
+     * 父级 Channel。
+     * Netty 的 Channel 创建是有层次的，
+     * 比如服务端 NioServerSocketChannel 是顶级 Channel，它的 parent = null，
+     * 客户端 NioSocketChannel 是由 NioServerSocketChannel 创建的，所以它的 parent = NioServerSocketChannel
+     */
     private final Channel parent;
+    /**
+     * 全局唯一 ID = machineId + processId + sequence + timestamp + random
+     */
     private final ChannelId id;
+    /**
+     * Channel 接口的一个内部接口，用于封装对底层 socket 相关操作，只能由 Netty 的 Reactor 线程调用
+     */
     private final Unsafe unsafe;
+    /**
+     * Channel 独立的 pipeline，用于 IO 事件编排。是一个 ChannelHandlerContext 的双向链表，ChannelHandlerContext 包装着 ChannelHandler
+     */
     private final DefaultChannelPipeline pipeline;
     private final VoidChannelPromise unsafeVoidPromise = new VoidChannelPromise(this, false);
     private final CloseFuture closeFuture = new CloseFuture(this);

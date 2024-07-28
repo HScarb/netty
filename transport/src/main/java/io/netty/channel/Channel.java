@@ -15,6 +15,9 @@
  */
 package io.netty.channel;
 
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.socket.DatagramChannel;
@@ -22,9 +25,6 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.AttributeMap;
-
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 
 
 /**
@@ -216,36 +216,42 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     interface Unsafe {
 
         /**
+         * 分配接收数据用的 Buffer
          * Return the assigned {@link RecvByteBufAllocator.Handle} which will be used to allocate {@link ByteBuf}'s when
          * receiving data.
          */
         RecvByteBufAllocator.Handle recvBufAllocHandle();
 
         /**
+         * 服务端绑定的端口地址
          * Return the {@link SocketAddress} to which is bound local or
          * {@code null} if none.
          */
         SocketAddress localAddress();
 
         /**
+         * 远端地址
          * Return the {@link SocketAddress} to which is bound remote or
          * {@code null} if none is bound yet.
          */
         SocketAddress remoteAddress();
 
         /**
+         * Channel 向 Reactor 注册
          * Register the {@link Channel} of the {@link ChannelPromise} and notify
          * the {@link ChannelFuture} once the registration was complete.
          */
         void register(EventLoop eventLoop, ChannelPromise promise);
 
         /**
+         * 服务端绑定端口地址
          * Bind the {@link SocketAddress} to the {@link Channel} of the {@link ChannelPromise} and notify
          * it once its done.
          */
         void bind(SocketAddress localAddress, ChannelPromise promise);
 
         /**
+         * 客户端连接服务端
          * Connect the {@link Channel} of the given {@link ChannelFuture} with the given remote {@link SocketAddress}.
          * If a specific local {@link SocketAddress} should be used it need to be given as argument. Otherwise just
          * pass {@code null} to it.
@@ -261,6 +267,7 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
         void disconnect(ChannelPromise promise);
 
         /**
+         * 关闭 Channel
          * Close the {@link Channel} of the {@link ChannelPromise} and notify the {@link ChannelPromise} once the
          * operation was complete.
          */
@@ -279,12 +286,14 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
         void deregister(ChannelPromise promise);
 
         /**
+         * 读数据
          * Schedules a read operation that fills the inbound buffer of the first {@link ChannelInboundHandler} in the
          * {@link ChannelPipeline}.  If there's already a pending read operation, this method does nothing.
          */
         void beginRead();
 
         /**
+         * 写数据
          * Schedules a write operation.
          */
         void write(Object msg, ChannelPromise promise);
