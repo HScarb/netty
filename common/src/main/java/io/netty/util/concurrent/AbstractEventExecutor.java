@@ -60,6 +60,9 @@ public abstract class AbstractEventExecutor extends AbstractExecutorService impl
         return this;
     }
 
+    /**
+     * 判断当前线程是否为 Reactor 线程
+     */
     @Override
     public boolean inEventLoop() {
         return inEventLoop(Thread.currentThread());

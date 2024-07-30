@@ -327,7 +327,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
                         // See https://github.com/netty/netty/issues/2586
                         promise.registered();
 
-                        // 注册成功后绑定端口
+                        // Channel 注册到 Reactor 成功后回调，开始绑定端口
                         doBind0(regFuture, channel, localAddress, promise);
                     }
                 }
@@ -338,6 +338,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * 创建 ServerSocketChannel，对其初始化，异步注册到 Main Reactor 上
+     * @return ChannelFuture 表示注册结果
      */
     final ChannelFuture initAndRegister() {
         // 创建和初始化 ServerSocketChannel

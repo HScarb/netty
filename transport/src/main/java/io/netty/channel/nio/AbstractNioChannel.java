@@ -59,6 +59,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * Channel 监听事件集合
      */
     protected final int readInterestOp;
+    /**
+     * Channel 注册到 Selector 后获得的 SelectKey
+     */
     volatile SelectionKey selectionKey;
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
@@ -390,6 +393,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         boolean selected = false;
         for (;;) {
             try {
+                // 将 Netty NioServerSocketChannel 中包装的 JDK NIO ServerSocketChannel 注册到 Reactor 的 JDK NIO Selector
+                // 这里监听 OP_ACCEPT 事件，并且将 NioServerSocketChannel 作为附件附加到 SelectionKey 中
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {

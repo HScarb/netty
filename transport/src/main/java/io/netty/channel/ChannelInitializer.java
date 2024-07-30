@@ -54,12 +54,18 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 public abstract class ChannelInitializer<C extends Channel> extends ChannelInboundHandlerAdapter {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ChannelInitializer.class);
+
+    /**
+     * ChannelInitializer 实例是被所有 Channel 共享的（Shareble），用于初始化 ChannelPipeline，
+     * 通过该 Set 集合保存已经初始化过的 ChannelHandlerContext，避免重复初始化同一 ChannelPipeline
+     */
     // We use a Set as a ChannelInitializer is usually shared between all Channels in a Bootstrap /
     // ServerBootstrap. This way we can reduce the memory usage compared to use Attributes.
     private final Set<ChannelHandlerContext> initMap = Collections.newSetFromMap(
             new ConcurrentHashMap<ChannelHandlerContext, Boolean>());
 
     /**
+     * 匿名类实现，这里指定具体的初始化逻辑，由 ServerBootstrap 定义时重载实现
      * This method will be called once the {@link Channel} was registered. After the method returns this instance
      * will be removed from the {@link ChannelPipeline} of the {@link Channel}.
      *
@@ -114,6 +120,7 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
             // will be added in the expected order.
             if (initChannel(ctx)) {
 
+                // 初始化工作完成后，需要将 ChannelInitializer 自身从 pipeline 中移除
                 // We are done with init the Channel, removing the initializer now.
                 removeState(ctx);
             }
@@ -137,6 +144,7 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
                 exceptionCaught(ctx, cause);
             } finally {
                 if (!ctx.isRemoved()) {
+                    // ChannelPipeline 初始化完毕后，从 pipeline 中移除自身
                     ctx.pipeline().remove(this);
                 }
             }
@@ -146,6 +154,7 @@ public abstract class ChannelInitializer<C extends Channel> extends ChannelInbou
     }
 
     private void removeState(final ChannelHandlerContext ctx) {
+        // 从 initMap Set 中删除 ChannelInitializer
         // The removal may happen in an async fashion if the EventExecutor we use does something funky.
         if (ctx.isRemoved()) {
             initMap.remove(ctx);

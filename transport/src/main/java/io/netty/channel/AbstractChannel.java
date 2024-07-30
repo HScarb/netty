@@ -494,6 +494,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 register0(promise);
             } else {
                 try {
+                    // 向 Reactor 线程提交注册 Channel 的任务，启动 Reactor 线程，
+                    // 线程启动后会首先运行 register0 方法，完成 Channel 的注册
                     eventLoop.execute(new Runnable() {
                         @Override
                         public void run() {
@@ -511,28 +513,44 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
         }
 
+        /**
+         * Channel 注册的真正实现，Reactor 线程启动后会先执行这个方法
+         * @param promise Channel 封装
+         */
         private void register0(ChannelPromise promise) {
             try {
+                // 查看注册操作是否已经取消，或者对应 Channel 已经关闭
                 // check if the channel is still open as it could be closed in the mean time when the register
                 // call was outside of the eventLoop
                 if (!promise.setUncancellable() || !ensureOpen(promise)) {
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+                // 执行真正的注册操作
                 doRegister();
+                // 修改注册状态
                 neverRegistered = false;
                 registered = true;
 
+                // 回调 pipeline 中唯一添加的 Channel Handler Context：ChannelInitializer 的 handlerAdded 方法，
+                // 在这里初始化 ChannelPipeline
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
                 pipeline.invokeHandlerAddedIfNeeded();
 
+                // 设置 regFuture 为 success，并回调注册在 promise 上的 ChannelFutureListener#operationComplete 方法。
+                // operationComplete 方法中，将 bind 操作（绑定端口）封装成异步任务，提交到 Reactor 的 taskQueue 中，
+                // 等待 Reactor 执行
                 safeSetSuccess(promise);
+                // 在 pipeline 触发 channelRegistered 事件，pipeline 中 channelHandler 的 channelRegistered 方法被回调
                 pipeline.fireChannelRegistered();
+                // 对于服务端 ServerSocketChannel 来说，只有绑定端口地址成功后 Channel 的状态才是 active 的，
+                // 此时绑定操作作为异步任务在 Reactor 的任务队列中，绑定操作还没开始，所以这里的 isActive 是 false
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
                     if (firstRegistration) {
+                        // 触发 channelActive 事件
                         pipeline.fireChannelActive();
                     } else if (config().isAutoRead()) {
                         // This channel was registered before and autoRead() is set. This means we need to begin read

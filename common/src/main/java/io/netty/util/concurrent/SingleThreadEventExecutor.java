@@ -56,6 +56,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(SingleThreadEventExecutor.class);
 
+    // ----- Reactor 线程状态 -----
+    /**
+     * 未启动
+     */
     private static final int ST_NOT_STARTED = 1;
     private static final int ST_STARTED = 2;
     private static final int ST_SHUTTING_DOWN = 3;
@@ -69,6 +73,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
     };
 
+    /**
+     * Reactor 线程状态字段 state 原子更新器，线程安全地更新 state 字段。
+     * 相比 AtomicInteger 的优势是没有额外内存开销。如果用 AtomicInteger，每个 SingleThreadEventExecutor 都会有额外的内存开销
+     */
     private static final AtomicIntegerFieldUpdater<SingleThreadEventExecutor> STATE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(SingleThreadEventExecutor.class, "state");
     private static final AtomicReferenceFieldUpdater<SingleThreadEventExecutor, ThreadProperties> PROPERTIES_UPDATER =
@@ -80,6 +88,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private volatile Thread thread;
     @SuppressWarnings("unused")
     private volatile ThreadProperties threadProperties;
+
+    /**
+     * {@link ThreadPerTaskExecutor} 用于启动和运行 Reactor 线程
+     */
     private final Executor executor;
     private volatile boolean interrupted;
 
@@ -91,6 +103,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private long lastExecutionTime;
 
+    /**
+     * 初始化 Reactor 线程状态为未启动状态
+     */
     @SuppressWarnings({ "FieldMayBeFinal", "unused" })
     private volatile int state = ST_NOT_STARTED;
 
@@ -171,7 +186,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         this.addTaskWakesUp = addTaskWakesUp;
         // Reactor 普通异步任务队列大小
         this.maxPendingTasks = DEFAULT_MAX_PENDING_EXECUTOR_TASKS;
-        // 用于启动 Reactor 线程的 executor
+        // 用于启动和运行 Reactor 线程的 executor
         this.executor = ThreadExecutorMap.apply(executor, this);
         // 普通任务队列
         this.taskQueue = ObjectUtil.checkNotNull(taskQueue, "taskQueue");
@@ -342,6 +357,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
+     * 将异步任务 task 添加到 Reactor 的阻塞队列 taskQueue 中
      * Add a task to the task queue, or throws a {@link RejectedExecutionException} if this instance was shutdown
      * before.
      */
@@ -836,9 +852,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void execute(Runnable task, boolean immediate) {
+        // 当前线程是否为 Reactor 线程
         boolean inEventLoop = inEventLoop();
+        // 唤醒 Reactor 线程执行任务（将异步任务 task 添加到 Reactor 的 taskQueue 中）
         addTask(task);
         if (!inEventLoop) {
+            // Reactor 线程的启动是通过向 NioEventLoop 添加异步任务来实现的
+            // 如果当前线程不是 Reactor 线程，则启动 Reactor 线程
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
@@ -951,6 +971,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private static final long SCHEDULE_PURGE_INTERVAL = TimeUnit.SECONDS.toNanos(1);
 
+    /**
+     * 启动 Reactor 线程
+     */
     private void startThread() {
         if (state == ST_NOT_STARTED) {
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
@@ -998,6 +1021,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    // Reactor 线程启动，内部包含 Reactor 线程的执行逻辑（死循环）
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {
