@@ -72,6 +72,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private static final int MIN_PREMATURE_SELECTOR_RETURNS = 3;
     private static final int SELECTOR_AUTO_REBUILD_THRESHOLD;
 
+    /**
+     * 用于 select 策略选择，返回 selectNow 的结果。selectNow 的结果是当前处于就绪状态的 Channel 数量
+     */
     private final IntSupplier selectNowSupplier = new IntSupplier() {
         @Override
         public int get() throws Exception {
@@ -143,10 +146,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private final AtomicLong nextWakeupNanos = new AtomicLong(AWAKE);
 
     /**
-     * Selector 轮询策略，决定什么时候轮询，什么时候处理 I/O 事件，什么时候执行异步任务
+     * Selector IO 事件轮询策略，决定什么时候轮询 IO 事件，什么时候处理 IO 事件，什么时候执行异步任务
      */
     private final SelectStrategy selectStrategy;
 
+    /**
+     * Reactor 线程执行 IO 事件和异步任务的 CPU 时间比例，默认 50，表示 IO 事件和异步任务的 CPU 时间比例各占一半
+     */
     private volatile int ioRatio = 50;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
@@ -560,20 +566,29 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     @Override
     protected void run() {
+        // 本轮次 select 次数，用于解决 JDK epoll 空轮询的 bug
         int selectCnt = 0;
         for (;;) {
             try {
+                //// 先判断是否有异步任务或者 IO 事件要执行，如果没有则一直在这里循环进行 select
+                // select 策略的计算结果
                 int strategy;
                 try {
+                    // 根据 select 策略计算当前轮次的操作
+                    // selectNowSupplier 返回当前处于就绪状态的 Channel 数量
+                    // hasTasks 主要检查的是 taskQueue 和 tailTasks 中是否有异步任务等待执行
                     strategy = selectStrategy.calculateStrategy(selectNowSupplier, hasTasks());
+                    // 根据计算的结果执行相应的操作，如果返回结果
                     switch (strategy) {
                     case SelectStrategy.CONTINUE:
                         continue;
 
                     case SelectStrategy.BUSY_WAIT:
+                        // NIO 不支持自旋（BUSY_WAIT）
                         // fall-through to SELECT since the busy-wait is not supported with NIO
 
                     case SelectStrategy.SELECT:
+                        // 在默认策略下，没有异步任务时才返回 SELECT，执行 select 操作轮询 IO 事件，如果有事件则唤醒后续流程
                         long curDeadlineNanos = nextScheduledTaskDeadlineNanos();
                         if (curDeadlineNanos == -1L) {
                             curDeadlineNanos = NONE; // nothing on the calendar
@@ -600,11 +615,15 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     continue;
                 }
 
+                // 满足唤醒条件，有异步任务或者 IO 事件需要处理
                 selectCnt++;
                 cancelledKeys = 0;
+                // 主要用于从 IO 就绪的 SelectedKeys 集合中提出已经失效的 SelectKey
                 needsToSelectAgain = false;
+                // 调整 Reactor 线程执行 IO 事件和异步任务的 CPU 时间比例，默认 50，表示 IO 事件和异步任务的 CPU 时间比例各占一半
                 final int ioRatio = this.ioRatio;
                 boolean ranTasks;
+                // 优先处理 IO 事件，然后根据 IO 事件处理的时间比例执行异步任务
                 if (ioRatio == 100) {
                     try {
                         if (strategy > 0) {
@@ -627,6 +646,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     ranTasks = runAllTasks(0); // This will run the minimum number of tasks
                 }
 
+                // 判断是否触发 JDK epoll bug 触发空 select
                 if (ranTasks || strategy > 0) {
                     if (selectCnt > MIN_PREMATURE_SELECTOR_RETURNS && logger.isDebugEnabled()) {
                         logger.debug("Selector.select() returned prematurely {} times in a row for Selector {}.",
@@ -634,6 +654,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     }
                     selectCnt = 0;
                 } else if (unexpectedSelectorWakeup(selectCnt)) { // Unexpected wakeup (unusual case)
+                    // 既没有 IO 事件，也没有异步任务，Reactor 线程从 Selector 上被异常唤醒，触发 JDK Epoll 空轮训 BUG
+                    // 重新构建 Selector，selectCnt 归零
                     selectCnt = 0;
                 }
             } catch (CancelledKeyException e) {

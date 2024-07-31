@@ -18,6 +18,7 @@ package io.netty.channel;
 import io.netty.util.IntSupplier;
 
 /**
+ * 默认的 Reactor 任务选择策略
  * Default select strategy.
  */
 final class DefaultSelectStrategy implements SelectStrategy {
@@ -25,6 +26,9 @@ final class DefaultSelectStrategy implements SelectStrategy {
 
     private DefaultSelectStrategy() { }
 
+    /**
+     * 计算当前轮次的 Reactor 操作，如果有异步任务，查询和返回 IO 事件数量；如果没有异步任务，执行 SELECT 操作轮询 IO 事件
+     */
     @Override
     public int calculateStrategy(IntSupplier selectSupplier, boolean hasTasks) throws Exception {
         return hasTasks ? selectSupplier.get() : SelectStrategy.SELECT;
