@@ -157,6 +157,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
     }
 
     /**
+     * 从定时任务队列中取出 1 个 deadline <= nanoTime 的定时任务
      * Return the {@link Runnable} which is ready to be executed with the given {@code nanoTime}.
      * You should use {@link #getCurrentTimeNanos()} to retrieve the correct {@code nanoTime}.
      */

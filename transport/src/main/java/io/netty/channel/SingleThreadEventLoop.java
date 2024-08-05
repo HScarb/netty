@@ -144,6 +144,9 @@ public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor im
         return tailTasks.remove(ObjectUtil.checkNotNull(task, "task"));
     }
 
+    /**
+     * 执行尾部队列任务
+     */
     @Override
     protected void afterRunningAllTasks() {
         runAllTasksFrom(tailTasks);

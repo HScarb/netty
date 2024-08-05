@@ -83,6 +83,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             AtomicReferenceFieldUpdater.newUpdater(
                     SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
 
+    /**
+     * 普通异步任务队列
+     */
     private final Queue<Runnable> taskQueue;
 
     private volatile Thread thread;
@@ -300,17 +303,25 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
     }
 
+    /**
+     * 从定时任务队列中取出达到执行时间（deadline）的任务，转存到普通异步任务队列 taskQueue 中，统一由 Reactor 线程从 taskQueue 执行
+     * @return true: 到期的定时任务已经全部取出放入 taskQueue，false: 有部分到期的定时任务因为 taskQueue 已满没有放入
+     */
     private boolean fetchFromScheduledTaskQueue() {
         if (scheduledTaskQueue == null || scheduledTaskQueue.isEmpty()) {
             return true;
         }
         long nanoTime = getCurrentTimeNanos();
+        // 从定时任务队列中取出所有到达执行时间（deadline）的任务
         for (;;) {
+            // 从定时任务队列中取出 1 个到达执行时间（deadline）的任务
             Runnable scheduledTask = pollScheduledTask(nanoTime);
             if (scheduledTask == null) {
                 return true;
             }
+            // 将到期的
             if (!taskQueue.offer(scheduledTask)) {
+                // taskQueue 满了，将定时任务重新放进定时任务队列中等待下次执行
                 // No space left in the task queue add it back to the scheduledTaskQueue so we pick it up again.
                 scheduledTaskQueue.add((ScheduledFutureTask<?>) scheduledTask);
                 return false;
@@ -396,6 +407,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         boolean ranAtLeastOne = false;
 
         do {
+            // 将到达执行时间的定时任务转存到普通异步任务队列 taskQueue 中，统一由 Reactor 线程从 taskQueue 中取出执行
             fetchedAll = fetchFromScheduledTaskQueue();
             if (runAllTasksFrom(taskQueue)) {
                 ranAtLeastOne = true;
@@ -405,6 +417,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         if (ranAtLeastOne) {
             lastExecutionTime = getCurrentTimeNanos();
         }
+        // 执行尾部队列任务
         afterRunningAllTasks();
         return ranAtLeastOne;
     }
@@ -439,15 +452,19 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
      * Runs all tasks from the passed {@code taskQueue}.
      *
      * @param taskQueue To poll and execute all tasks.
+     *                  任务队列，普通任务队列或尾部任务队列
      *
      * @return {@code true} if at least one task was executed.
+     *          是否至少执行了一个异步任务
      */
     protected final boolean runAllTasksFrom(Queue<Runnable> taskQueue) {
+        // 从 taskQueue 获取一个异步任务
         Runnable task = pollTaskFrom(taskQueue);
         if (task == null) {
             return false;
         }
         for (;;) {
+            // 执行异步任务
             safeExecute(task);
             task = pollTaskFrom(taskQueue);
             if (task == null) {
@@ -485,10 +502,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         fetchFromScheduledTaskQueue();
         Runnable task = pollTask();
         if (task == null) {
+            // 普通队列中没有任务，直接执行尾部队列的任务
             afterRunningAllTasks();
             return false;
         }
 
+        // 异步任务执行超时 deadline
         final long deadline = timeoutNanos > 0 ? getCurrentTimeNanos() + timeoutNanos : 0;
         long runTasks = 0;
         long lastExecutionTime;
@@ -497,11 +516,13 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
             runTasks ++;
 
+            // 每运行 64 个异步任务，检查一下是否到达执行 deadline。不每个任务都检查，因为 System.nanoTime 有一定的系统开销
             // Check timeout every 64 tasks because nanoTime() is relatively expensive.
             // XXX: Hard-coded value - will make it configurable if it is really a problem.
             if ((runTasks & 0x3F) == 0) {
                 lastExecutionTime = getCurrentTimeNanos();
                 if (lastExecutionTime >= deadline) {
+                    // 到达异步任务执行 deadline，停止执行异步任务
                     break;
                 }
             }
@@ -519,6 +540,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
+     * 执行尾部队列任务
      * Invoked before returning from {@link #runAllTasks()} and {@link #runAllTasks(long)}.
      */
     protected void afterRunningAllTasks() { }

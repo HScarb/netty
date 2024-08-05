@@ -348,6 +348,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             try {
                 boolean wasActive = isActive();
                 doFinishConnect();
+                // 在 Netty 客户端 NioSocketChannel 中的 pipeline 中传播 ChannelActive 事件
                 fulfillConnectPromise(connectPromise, wasActive);
             } catch (Throwable t) {
                 fulfillConnectPromise(connectPromise, annotateConnectException(t, requestedRemoteAddress));
@@ -428,6 +429,10 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         readPending = true;
 
         final int interestOps = selectionKey.interestOps();
+        /**
+         * 1. ServerSocketChannel 初始化时 readInterestOp 设置的是 OP_ACCEPT 事件
+         * 2. SocketChannel 初始化时 readInterestOp 设置的是 OP_READ 事件
+         */
         if ((interestOps & readInterestOp) == 0) {
             selectionKey.interestOps(interestOps | readInterestOp);
         }
