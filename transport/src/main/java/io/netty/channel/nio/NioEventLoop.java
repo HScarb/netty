@@ -139,6 +139,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private static final long AWAKE = -1L;
     private static final long NONE = Long.MAX_VALUE;
 
+    /**
+     * Reactor 下次苏醒（不被 select 阻塞）的时间，或者表示苏醒的状态
+     */
     // nextWakeupNanos is:
     //    AWAKE            when EL is awake
     //    NONE             when EL is waiting with no wakeup scheduled
@@ -151,7 +154,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private final SelectStrategy selectStrategy;
 
     /**
-     * Reactor 线程执行 IO 事件和异步任务的 CPU 时间比例，默认 50，表示 IO 事件和异步任务的 CPU 时间比例各占一半
+     * Reactor 线程执行 IO 事件和异步任务的 CPU 执行时间比例，默认 50，表示 IO 事件和异步任务的 CPU 时间比例各占一半
      */
     private volatile int ioRatio = 50;
     private int cancelledKeys;
@@ -588,17 +591,25 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         // fall-through to SELECT since the busy-wait is not supported with NIO
 
                     case SelectStrategy.SELECT:
-                        // 在默认策略下，没有异步任务时才返回 SELECT，执行 select 操作轮询 IO 事件，如果有事件则唤醒后续流程
+                        // 在默认策略下，没有异步任务时才返回 SELECT，执行 select 操作轮询 IO 事件，如果有 IO 事件则唤醒后续流程
+
+                        // 从定时任务队列中取出即将执行的定时任务 deadline
                         long curDeadlineNanos = nextScheduledTaskDeadlineNanos();
                         if (curDeadlineNanos == -1L) {
+                            // 当前定时任务队列中没有定时任务
                             curDeadlineNanos = NONE; // nothing on the calendar
                         }
+                        // 最早需要执行的定时任务的 deadline 作为 select 的阻塞目标时间，到了该时间必须唤醒 selector，
+                        // 让 Reactor 执行定时任务
                         nextWakeupNanos.set(curDeadlineNanos);
                         try {
                             if (!hasTasks()) {
+                                // 再次检查普通任务队列中是否有异步任务，没有则开始 select，阻塞等待 IO 事件，直到目标时间
                                 strategy = select(curDeadlineNanos);
                             }
                         } finally {
+                            // Reactor 已经从 Selector 上被唤醒，设置 Reactor 的状态为 AWAKE
+                            // lazySet 优化不必要的 volatile 操作，不适用内存屏障，不保证写操作的可见性（这里单线程不需要保证）
                             // This update is just to help block unnecessary selector wakeups
                             // so use of lazySet is ok (no race condition)
                             nextWakeupNanos.lazySet(AWAKE);
@@ -623,8 +634,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 // 调整 Reactor 线程执行 IO 事件和异步任务的 CPU 时间比例，默认 50，表示 IO 事件和异步任务的 CPU 时间比例各占一半
                 final int ioRatio = this.ioRatio;
                 boolean ranTasks;
-                // 优先处理 IO 事件，然后根据 IO 事件处理的时间比例执行异步任务
+                // 如果有 IO 事件和异步任务同时发生，优先处理 IO 事件，然后根据 IO 事件处理的执行时间比例决定执行多久异步任务
                 if (ioRatio == 100) {
+                    // IO 事件 CPU 占比 100%
                     try {
                         if (strategy > 0) {
                             processSelectedKeys();
@@ -634,6 +646,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         ranTasks = runAllTasks();
                     }
                 } else if (strategy > 0) {
+                    // IO 事件 CPU 占比 1% ~ 99%
+                    // 统计 IO 事件执行事件
                     final long ioStartTime = System.nanoTime();
                     try {
                         processSelectedKeys();
@@ -643,6 +657,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         ranTasks = runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
                     }
                 } else {
+                    // 没有 IO 事件，执行异步任务，这里最多执行 64 个异步任务
                     ranTasks = runAllTasks(0); // This will run the minimum number of tasks
                 }
 
@@ -927,8 +942,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * 将 Reactor 线程从 select 方法上唤醒
+     * @param inEventLoop
+     */
     @Override
     protected void wakeup(boolean inEventLoop) {
+        // 当 nextWakeupNanos == AWAKE 表示 Reactor 处于苏醒状态，不需要再次唤醒
         if (!inEventLoop && nextWakeupNanos.getAndSet(AWAKE) != AWAKE) {
             selector.wakeup();
         }
@@ -954,10 +974,18 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         return selector.selectNow();
     }
 
+    /**
+     * 轮询 IO 事件
+     * @param deadlineNanos 本次轮询结束时间
+     * @return IO 事件数量
+     */
     private int select(long deadlineNanos) throws IOException {
         if (deadlineNanos == NONE) {
+            // 无定时任务，无普通任务执行时，开始轮询 IO 事件，没有任务就一直阻塞
             return selector.select();
         }
+        // 纳秒转换成毫秒，转换前加 0.995 毫秒，当最近一个定时任务的 deadline 在 5 微秒内，这里算出的时间是 0，不进行阻塞
+        // 这里是为了在有定时任务的情况下，至少在 select 上阻塞 1 毫秒
         // Timeout will only be 0 if deadline is within 5 microsecs
         long timeoutMillis = deadlineToDelayNanos(deadlineNanos + 995000L) / 1000000L;
         return timeoutMillis <= 0 ? selector.selectNow() : selector.select(timeoutMillis);

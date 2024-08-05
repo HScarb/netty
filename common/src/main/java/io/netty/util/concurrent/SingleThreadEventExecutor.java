@@ -97,6 +97,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private final CountDownLatch threadLock = new CountDownLatch(1);
     private final Set<Runnable> shutdownHooks = new LinkedHashSet<Runnable>();
+    /**
+     * 是否仅有调用 addTask 方法时才会唤醒 Reactor 线程（从 select 方法上唤醒）。默认为 false，execute 方法也能唤醒。
+     */
     private final boolean addTaskWakesUp;
     private final int maxPendingTasks;
     private final RejectedExecutionHandler rejectedExecutionHandler;
@@ -474,6 +477,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
+     * 执行异步任务和定时任务，执行 timeoutNanos 时间。每执行 64 个任务检查一次当前执行的时间是否超过 timeoutNanos
      * Poll all tasks from the task queue and run them via {@link Runnable#run()} method.  This method stops running
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
      */
@@ -851,6 +855,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         execute(ObjectUtil.checkNotNull(task, "task"), false);
     }
 
+    /**
+     * 执行异步任务
+     * @param immediate 提交的 task 是否需要被立即执行。Netty 中只要你提交的任务类型不是 LazyRunnable 类型的任务，都是需要立即执行的
+     */
     private void execute(Runnable task, boolean immediate) {
         // 当前线程是否为 Reactor 线程
         boolean inEventLoop = inEventLoop();
@@ -877,6 +885,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             }
         }
 
+        // 不只有 addTask 方法才会唤醒 Reactor 线程，execute 方法也会唤醒；异步任务需要立即执行
         if (!addTaskWakesUp && immediate) {
             wakeup(inEventLoop);
         }

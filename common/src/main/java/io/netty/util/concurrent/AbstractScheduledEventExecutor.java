@@ -36,6 +36,9 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
                 }
             };
 
+    /**
+     * 启动时间点
+     */
     private static final long START_TIME = System.nanoTime();
 
     static final Runnable WAKEUP_TASK = new Runnable() {
@@ -43,6 +46,9 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
        public void run() { } // Do nothing
     };
 
+    /**
+     * 定时任务队列
+     */
     PriorityQueue<ScheduledFutureTask<?>> scheduledTaskQueue;
 
     long nextTaskId;
@@ -80,6 +86,9 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
         return System.nanoTime() - START_TIME;
     }
 
+    /**
+     * 计算定时任务执行 deadline
+     */
     static long deadlineNanos(long nanoTime, long delay) {
         long deadlineNanos = nanoTime + delay;
         // Guard against overflow
@@ -172,6 +181,7 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
     }
 
     /**
+     * 获取即将要执行的定时任务的最晚执行时间（deadline）
      * Return the deadline (in nanoseconds) when the next scheduled task is ready to be run or {@code -1}
      * if no task is scheduled.
      */
