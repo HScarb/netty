@@ -149,6 +149,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
     @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     @Override
     protected void doBind(SocketAddress localAddress) throws Exception {
+        // 调用 JDK NIO 底层 SelectableChannel 执行绑定操作
         if (PlatformDependent.javaVersion() >= 7) {
             javaChannel().bind(localAddress, config.getBacklog());
         } else {
@@ -161,11 +162,19 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         javaChannel().close();
     }
 
+    /**
+     * 调用 {@link ServerSocketChannel#accept()} 创建客户端 {@link SocketChannel}
+     * @param buf 用来存放创建的客户端 {@link SocketChannel}
+     * @return 接收的客户端连接数量，正常为 1，<= 0 表示没有新的客户端连接可以接收
+     * @throws Exception
+     */
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
+        // 从内核全连接队列中取出客户端连接
         SocketChannel ch = SocketUtils.accept(javaChannel());
 
         try {
+            // 将建立的客户端 SocketChannel 存放到 readBuf 中
             if (ch != null) {
                 buf.add(new NioSocketChannel(this, ch));
                 return 1;

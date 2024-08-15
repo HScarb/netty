@@ -301,6 +301,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     @Override
     public Channel read() {
+        // 触发 read 事件在 pipeline 传播
         pipeline.read();
         return this;
     }
@@ -589,8 +590,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         "address (" + localAddress + ") anyway as requested.");
             }
 
+            // 此时 Channel 还未激活 wasActive = false
             boolean wasActive = isActive();
             try {
+                // 调用具体 Channel 实现类（NioServerSocketChannel#doBind）
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
@@ -598,15 +601,18 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 绑定成功后 Channel 激活，触发 channelActive 事件传播。这里封装成异步任务放入 Reactor 中的 taskQueue 中
             if (!wasActive && isActive()) {
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
+                        // pipeline 中触发 channelActive 事件
                         pipeline.fireChannelActive();
                     }
                 });
             }
 
+            // 回调注册在 promise 上的 ChannelFutureListener
             safeSetSuccess(promise);
         }
 
@@ -859,9 +865,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void beginRead() {
+            // 执行该方法的线程必须是 Reactor 线程
             assertEventLoop();
 
             try {
+                // 在 Selector 上注册 Channel 感兴趣的事件
                 doBeginRead();
             } catch (final Exception e) {
                 invokeLater(new Runnable() {

@@ -337,7 +337,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
-     * 创建 ServerSocketChannel，对其初始化，异步注册到 Main Reactor 上
+     * 创建 {@link io.netty.channel.socket.ServerSocketChannel} 对其初始化，异步注册到 Main Reactor 上
      * @return ChannelFuture 表示注册结果
      */
     final ChannelFuture initAndRegister() {

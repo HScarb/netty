@@ -111,6 +111,12 @@ public final class SocketUtils {
         }
     }
 
+    /**
+     * 接受单个客户端连接，从内核全连接队列中取出客户端连接
+     * @param serverSocketChannel
+     * @return 客户端 SocketChannel
+     * @throws IOException
+     */
     public static SocketChannel accept(final ServerSocketChannel serverSocketChannel) throws IOException {
         try {
             return AccessController.doPrivileged(new PrivilegedExceptionAction<SocketChannel>() {

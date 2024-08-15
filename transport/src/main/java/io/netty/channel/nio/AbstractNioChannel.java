@@ -57,6 +57,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     /**
      * Channel 监听事件集合
+     * 1. ServerSocketChannel 初始化时 readInterestOp 设置的是 OP_ACCEPT 事件
+     * 2. SocketChannel 初始化时 readInterestOp 设置的是 OP_READ 事件
      */
     protected final int readInterestOp;
     /**
@@ -395,7 +397,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         for (;;) {
             try {
                 // 将 Netty NioServerSocketChannel 中包装的 JDK NIO ServerSocketChannel 注册到 Reactor 的 JDK NIO Selector
-                // 这里监听 OP_ACCEPT 事件，并且将 NioServerSocketChannel 作为附件附加到 SelectionKey 中
+                // 这里不注册任何事件（0），先获取到 Channel 在 Selector 中对应的 SelectionKey，再去向 SelectionKey 添加感兴趣的事件，
+                // 同时将 NioServerSocketChannel 作为附件附加到 SelectionKey 中
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
@@ -432,6 +435,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         /**
          * 1. ServerSocketChannel 初始化时 readInterestOp 设置的是 OP_ACCEPT 事件
          * 2. SocketChannel 初始化时 readInterestOp 设置的是 OP_READ 事件
+         * 这里将需要监听的事件添加到 interestOps 集合中
          */
         if ((interestOps & readInterestOp) == 0) {
             selectionKey.interestOps(interestOps | readInterestOp);
