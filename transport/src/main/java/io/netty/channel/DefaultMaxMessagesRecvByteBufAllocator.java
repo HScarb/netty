@@ -88,12 +88,23 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
     }
 
     /**
+     * 保存每次从 Channel 中读取 IO 数据的容量指标，方便下次读取时分配合适大小的 buffer
      * Focuses on enforcing the maximum messages per read condition for {@link #continueReading()}.
      */
     public abstract class MaxMessageHandle implements ExtendedHandle {
         private ChannelConfig config;
+        /**
+         * 用于控制 IO 事件轮询时的 read loop 中最大可以循环读取的次数，默认最多读取 16 次，
+         * 可在 ServerBootstrap 中通过 ChannelOption.MAX_MESSAGES_PER_READ 配置
+         */
         private int maxMessagePerRead;
+        /**
+         * 本次事件轮询 read loop 总共读取的 message 数，在服务端 socket 中指的是接收客户端连接的数量
+         */
         private int totalMessages;
+        /**
+         * 本次事件轮询 read loop 总共读取的字节数，主要用于 sub reactor 在接收客户端 {@link io.netty.channel.socket.nio.NioSocketChannel} 上的网络数据用
+         */
         private int totalBytesRead;
         private int attemptedBytesRead;
         private int lastBytesRead;
@@ -111,6 +122,7 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
         @Override
         public void reset(ChannelConfig config) {
             this.config = config;
+            // 默认每次最多读取 16 次
             maxMessagePerRead = maxMessagesPerRead();
             totalMessages = totalBytesRead = 0;
         }
@@ -138,6 +150,10 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
             return lastBytesRead;
         }
 
+        /**
+         * 判断读取次数是否超过限制 {@link MaxMessageHandle#maxMessagesPerRead()}，是否继续读取
+         * @return
+         */
         @Override
         public boolean continueReading() {
             return continueReading(defaultMaybeMoreSupplier);
@@ -147,6 +163,7 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
         public boolean continueReading(UncheckedBooleanSupplier maybeMoreDataSupplier) {
             return config.isAutoRead() &&
                    (!respectMaybeMoreData || maybeMoreDataSupplier.get()) &&
+                // 读取次数未超过限制，并且读到了网络数据
                    totalMessages < maxMessagePerRead && (ignoreBytesRead || totalBytesRead > 0);
         }
 

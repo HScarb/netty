@@ -23,6 +23,7 @@ import io.netty.util.internal.UnstableApi;
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
+ * 用于分配接收缓冲区（用来接受 Channel 上 IO 数据的 {@link io.netty.buffer.ByteBuf}）的分配器。
  * Allocates a new receive buffer whose capacity is probably large enough to read all inbound data and small enough
  * not to waste its space.
  */

@@ -23,6 +23,14 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 /**
+ * 用于分配接收缓冲区（用来接受 Channel 上 IO 数据的 {@link io.netty.buffer.ByteBuf}）的 {@link RecvByteBufAllocator}，
+ * 它会根据反馈自动增加和减少预测的缓冲区大小。
+ *
+ * 对服务端 {@link io.netty.channel.socket.nio.NioServerSocketChannel} 来说，它上面的 IO 数据就是客户端的连接，
+ * 它的长度和类型都是固定的，所以在接收客户端连接的时候不需要这样一个 ByteBuffer 来接收，客户端连接都放在 {@code List<Object> readBuf}
+ * 对客户端 {@link io.netty.channel.socket.nio.NioSocketChannel} 来说，它上免得 IO 数据是客户端发送来的网络数据，长度不固定，
+ * 所以需要这样一个可以根据每次 IO 数据的大小来自适应动态调整容量的 ByteBuffer 来接收。
+ *
  * The {@link RecvByteBufAllocator} that automatically increases and
  * decreases the predicted buffer size on feed back.
  * <p>
@@ -204,6 +212,10 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
         this.maxCapacity = maximum;
     }
 
+    /**
+     * 创建自适应动态调整容量的 {@link io.netty.buffer.ByteBuf} 分配器
+     * @return
+     */
     @SuppressWarnings("deprecation")
     @Override
     public Handle newHandle() {
