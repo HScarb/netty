@@ -104,6 +104,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
         // 父类 AbstractNioChannel 初始化，保存 JDK NIO 原生 ServerSocketChannel 以及要监听的 OP_ACCEPT 操作
+        // 父 channel 是 null，它是顶层 Channel
         super(null, channel, SelectionKey.OP_ACCEPT);
         // 创建Channel的配置类NioServerSocketChannelConfig，在配置类中封装了对Channel底层的一些配置行为，以及JDK中的ServerSocket
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());
@@ -136,6 +137,10 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         return null;
     }
 
+    /**
+     * 获取 JDK 原生 {@link ServerSocketChannel}
+     * @return
+     */
     @Override
     protected ServerSocketChannel javaChannel() {
         return (ServerSocketChannel) super.javaChannel();
@@ -174,7 +179,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
         SocketChannel ch = SocketUtils.accept(javaChannel());
 
         try {
-            // 将建立的客户端 SocketChannel 存放到 readBuf 中
+            // 新建客户端 SocketChannel，存放到 readBuf 中。SocketChannel 的父 channel 设为当前的 NioServerSocketChannel
             if (ch != null) {
                 buf.add(new NioSocketChannel(this, ch));
                 return 1;

@@ -26,6 +26,9 @@ import io.netty.util.UncheckedBooleanSupplier;
  * and also prevents overflow.
  */
 public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessagesRecvByteBufAllocator {
+    /**
+     * 是否忽略网络字节的读取，在创建服务端 {@link io.netty.channel.socket.nio.NioServerSocketChannel} 时这个字段为 true
+     */
     private final boolean ignoreBytesRead;
     private volatile int maxMessagesPerRead;
     private volatile boolean respectMaybeMoreData = true;
@@ -164,6 +167,7 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
             return config.isAutoRead() &&
                    (!respectMaybeMoreData || maybeMoreDataSupplier.get()) &&
                 // 读取次数未超过限制，并且读到了网络数据
+                // 如果 ignoreBytesRead 为 true（服务端接收连接），忽略 totalBytesRead == 0 的情况，继续读取，知道接收 16 个连接
                    totalMessages < maxMessagePerRead && (ignoreBytesRead || totalBytesRead > 0);
         }
 

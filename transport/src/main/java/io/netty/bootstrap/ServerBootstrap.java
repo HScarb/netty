@@ -252,8 +252,10 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
             final Channel child = (Channel) msg;
 
+            // 向客户端 NioSocketChannel 的 pipeline 中添加 ServerBootstrap 中配置的 child ChannelHandler
             child.pipeline().addLast(childHandler);
 
+            // 利用配置的属性初始化客户端 NioSocketChannel
             setChannelOptions(child, childOptions, logger);
             setAttributes(child, childAttrs);
 
@@ -268,6 +270,11 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             }
 
             try {
+                /**
+                 * 1. 在 Sub Reactor 线程组中选择一个 Reactor 绑定
+                 * 2. 将客户端 SocketChannel 注册到绑定的 Reactor 上
+                 * 3. SocketChannel 注册到 Sub Reactor 中的 Selector 上，监听 OP_READ 事件
+                 */
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {

@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * 服务端 {@link io.netty.channel.socket.nio.NioServerSocketChannel} 的基类，Message 指的是底层的客户端连接 {@link java.nio.channels.SocketChannel}
  * {@link AbstractNioChannel} base class for {@link Channel}s that operate on messages.
  */
 public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
@@ -106,14 +107,14 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                     exception = t;
                 }
 
-                // 遍历 readBuf 中的客户端 SocketChannel
+                // 遍历 readBuf 中的客户端 SocketChannel，传播 ChannelRead 事件
                 int size = readBuf.size();
                 for (int i = 0; i < size; i ++) {
                     readPending = false;
                     /**
-                     * 在服务端 NioServerSocketChannel 对应的 pipeline 中传播 ChannelRead 事件
+                     * 在服务端 NioServerSocketChannel 对应的 pipeline 中传播 ChannelRead 事件，最终会传到 {@link io.netty.bootstrap.ServerBootstrap.ServerBootstrapAcceptor} 上。
                      * {@link io.netty.bootstrap.ServerBootstrap.ServerBootstrapAcceptor#channelRead(ChannelHandlerContext, Object)}
-                     * 初始化客户端 SocketChannel，并将其绑定到 Sub Reactor 组中的一个 Reactor 上
+                     * 初始化客户端 {@link io.netty.channel.socket.SocketChannel} 并将其绑定到 Sub Reactor 组中的一个 Reactor 上
                      */
                     pipeline.fireChannelRead(readBuf.get(i));
                 }

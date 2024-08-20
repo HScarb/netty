@@ -84,8 +84,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
+        // 创建全局唯一的 ChannelId
         id = newId();
+        // 创建 Channel 底层操作类
         unsafe = newUnsafe();
+        // 为 Channel 分配独立的 pipeline 用于 IO 事件编排
         pipeline = newChannelPipeline();
     }
 
@@ -476,6 +479,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             return remoteAddress0();
         }
 
+        /**
+         * 注册 Sub Reactor 到 Channel
+         * @param eventLoop
+         * @param promise
+         */
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
@@ -491,9 +499,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             AbstractChannel.this.eventLoop = eventLoop;
 
+            // 必须是 Reactor 线程来执行 Channel 注册的操作
+            // 在 Main Reactor 中将 Sub Reactor 注册到 客户端 Channel 的场景，此时传入的 eventLoop 是 Sub Reactor，inEventLoop 返回 false
+            // 如果当前执行线程是 Reactor 线程，直接执行 register0 进行注册
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
+                // 如果执行线程是外部线程，将 register0 封装成异步任务提交到 Reactor 的 taskQueue 中，由 Reactor 线程执行
                 try {
                     // 向 Reactor 线程提交注册 Channel 的任务，启动 Reactor 线程，
                     // 线程启动后会首先运行 register0 方法，完成 Channel 的注册
@@ -547,11 +559,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 pipeline.fireChannelRegistered();
                 // 对于服务端 ServerSocketChannel 来说，只有绑定端口地址成功后 Channel 的状态才是 active 的，
                 // 此时绑定操作作为异步任务在 Reactor 的任务队列中，绑定操作还没开始，所以这里的 isActive 是 false
+                // 对客户端 NioSocketChannel 来说，isActive 取决于 Connected 状态，这里是 true
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
                     if (firstRegistration) {
-                        // 触发 channelActive 事件
+                        // 触发 channelActive 事件，在 NioSocketChannel 的 pipeline 中传播 ChannelActive 事件
+                        // 最终在 pipeline 的头节点 HeadContext 中响应并注册 OP_READ 事件到 Sub Reactor 中的 Selector 上
                         pipeline.fireChannelActive();
                     } else if (config().isAutoRead()) {
                         // This channel was registered before and autoRead() is set. This means we need to begin read

@@ -122,6 +122,8 @@ public final class SocketUtils {
             return AccessController.doPrivileged(new PrivilegedExceptionAction<SocketChannel>() {
                 @Override
                 public SocketChannel run() throws IOException {
+                    // 通过 JDK NIO 原生的 ServerSocketChannel 的 accept 方法获取 JDK NIO 原生客户端连接 SocketChannel
+                    // 这里的 ServerSocketChannel 在创建时设为非阻塞的，所以在没有客户端连接时 accept 会直接返回 null
                     return serverSocketChannel.accept();
                 }
             });

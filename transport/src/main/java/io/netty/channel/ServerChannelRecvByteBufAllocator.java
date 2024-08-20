@@ -16,6 +16,7 @@
 package io.netty.channel;
 
 /**
+ * 服务端 @{@link io.netty.channel.socket.ServerSocketChannel} 使用的 ByteBuf 分配器，专门用于服务端 ServerSocketChannel 接收客户端连接的场景
  * {@link MaxMessagesRecvByteBufAllocator} implementation which should be used for {@link ServerChannel}s.
  */
 public final class ServerChannelRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufAllocator {

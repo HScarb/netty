@@ -38,6 +38,7 @@ import java.nio.channels.SelectionKey;
 import static io.netty.channel.internal.ChannelUtils.WRITE_STATUS_SNDBUF_FULL;
 
 /**
+ * 客户端 {@link io.netty.channel.socket.nio.NioSocketChannel} 的基类，从网络读写数据，数据单位是 byte
  * {@link AbstractNioChannel} base class for {@link Channel}s that operate on bytes.
  */
 public abstract class AbstractNioByteChannel extends AbstractNioChannel {
@@ -57,12 +58,14 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     private boolean inputClosedSeenErrorOnRead;
 
     /**
+     * 初始化 {@link io.netty.channel.socket.nio.NioSocketChannel}
      * Create a new instance
      *
      * @param parent            the parent {@link Channel} by which this instance was created. May be {@code null}
      * @param ch                the underlying {@link SelectableChannel} on which it operates
      */
     protected AbstractNioByteChannel(Channel parent, SelectableChannel ch) {
+        // 父 Channel 为 ServerSocketChannel，注册 OP_READ 事件
         super(parent, ch, SelectionKey.OP_READ);
     }
 
